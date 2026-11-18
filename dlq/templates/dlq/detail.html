@@ -1,0 +1,11 @@
+{% extends "dlq/base.html" %}{% block content %}
+<p><a href="{% url 'dlq_list' %}">&larr; Retour</a></p>
+<h2>DLQ #{{ dl.pk }} — {{ dl.source_group }} ({{ dl.status }})</h2>
+{% if flash %}<p class="{% if ok %}ok{% else %}ko{% endif %}">{{ flash }}</p>{% endif %}
+<h3>Message brut</h3><pre>{{ dl.payload }}</pre>
+<h3>Erreur</h3><pre>{{ dl.error }}</pre>
+<h3>Stack trace</h3><pre>{{ dl.stacktrace }}</pre>
+<form method="post" action="{% url 'dlq_suggest' dl.pk %}">{% csrf_token %}<button>Demander une correction à l'agent IA</button></form>
+<h3>Payload à rejouer (validé par Pydantic avant envoi)</h3>
+<form method="post" action="{% url 'dlq_replay' dl.pk %}">{% csrf_token %}
+<textarea name="payload" rows="14">{{ editor }}</textarea><button>Rejouer</button></form>{% endblock %}
