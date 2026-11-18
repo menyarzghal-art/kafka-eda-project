@@ -1,0 +1,27 @@
+{
+  "name": "DLQ alert + AI suggestion",
+  "nodes": [
+    {"parameters": {"httpMethod": "POST", "path": "dlq-alert", "options": {}},
+     "id": "n1", "name": "Webhook DLQ", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0],
+     "webhookId": "dlq-alert"},
+    {"parameters": {"method": "POST", "url": "=http://host.docker.internal:8000/dlq/api/{{ $json.body.dlq_id }}/suggest/", "options": {}},
+     "id": "n2", "name": "Agent IA + Pydantic", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [260, 0]},
+    {"parameters": {"conditions": {"options": {"caseSensitive": true, "typeValidation": "strict"},
+       "conditions": [{"id": "c1", "leftValue": "={{ $json.valid }}", "rightValue": true,
+                       "operator": {"type": "boolean", "operation": "true", "singleValue": true}}], "combinator": "and"}},
+     "id": "n3", "name": "Suggestion valide ?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [520, 0]},
+    {"parameters": {"assignments": {"assignments": [{"id": "a1", "name": "alerte", "type": "string",
+       "value": "=DLQ #{{ $json.dlq_id }} : correction proposée et VALIDÉE. Ouvrir http://localhost:8000/dlq/{{ $json.dlq_id }}/ pour rejouer."}]}, "options": {}},
+     "id": "n4", "name": "Alerte: prêt au rejeu", "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [780, -80]},
+    {"parameters": {"assignments": {"assignments": [{"id": "a2", "name": "alerte", "type": "string",
+       "value": "=DLQ #{{ $json.dlq_id }} : l'agent n'a pas produit de correction valide. Intervention humaine requise."}]}, "options": {}},
+     "id": "n5", "name": "Alerte: humain requis", "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [780, 100]}
+  ],
+  "connections": {
+    "Webhook DLQ": {"main": [[{"node": "Agent IA + Pydantic", "type": "main", "index": 0}]]},
+    "Agent IA + Pydantic": {"main": [[{"node": "Suggestion valide ?", "type": "main", "index": 0}]]},
+    "Suggestion valide ?": {"main": [[{"node": "Alerte: prêt au rejeu", "type": "main", "index": 0}],
+                                      [{"node": "Alerte: humain requis", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}
