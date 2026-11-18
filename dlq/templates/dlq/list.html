@@ -1,0 +1,5 @@
+{% extends "dlq/base.html" %}{% block content %}
+<table><tr><th>#</th><th>Groupe</th><th>Erreur</th><th>Statut</th><th>Date</th></tr>
+{% for l in letters %}<tr><td><a href="{% url 'dlq_detail' l.pk %}">{{ l.pk }}</a></td><td>{{ l.source_group }}</td>
+<td>{{ l.error|truncatechars:80 }}</td><td>{{ l.status }}</td><td>{{ l.created_at }}</td></tr>
+{% empty %}<tr><td colspan="5">Aucun message en DLQ.</td></tr>{% endfor %}</table>{% endblock %}
