@@ -7,6 +7,9 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from consumers.models import ProcessedEvent
+from dlq.utils import send_to_dlq
+
+MAX_ATTEMPTS = 3
 
 
 def action_billing(e):
@@ -42,20 +45,30 @@ class Command(BaseCommand):
             if msg is None or msg.error():
                 continue
 
+            # 1) message invalide : direct en DLQ
             try:
                 event = json.loads(msg.value())
                 event["event_id"] = str(uuid.UUID(event["event_id"]))
             except (ValueError, KeyError, TypeError) as err:
-                print(f"[{group}] message invalide ignoré : {err}")
+                print(f"[{group}] message invalide -> DLQ : {err}")
+                send_to_dlq(msg.value(), msg.key(), err, group)
                 c.commit(msg)
                 continue
 
-            with transaction.atomic():
-                _, created = ProcessedEvent.objects.get_or_create(
-                    event_id=event["event_id"], consumer_group=group)
-                if created:
-                    ACTIONS[group](event)
-                else:
-                    print(f"[{group}] doublon {event['event_id']} ignoré")
+            # 2) traitement avec 3 essais, puis DLQ
+            for attempt in range(1, MAX_ATTEMPTS + 1):
+                try:
+                    with transaction.atomic():
+                        _, created = ProcessedEvent.objects.get_or_create(
+                            event_id=event["event_id"], consumer_group=group)
+                        if created:
+                            ACTIONS[group](event)
+                        else:
+                            print(f"[{group}] doublon {event['event_id']} ignoré")
+                    break
+                except Exception as err:
+                    print(f"[{group}] échec {attempt}/{MAX_ATTEMPTS} : {err}")
+                    if attempt == MAX_ATTEMPTS:
+                        send_to_dlq(msg.value(), msg.key(), err, group)
 
             c.commit(msg)
